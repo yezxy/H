@@ -1,0 +1,159 @@
+local tk = require 'lua-tk'
+local screenshot = require 'luascreenshot'
+local gd = require 'gd'
+local cv = require 'cv'
+require 'cv.imgproc'
+require 'cv.objdetect'
+require 'cv.videoio'
+
+-- Function to detect faces in an image
+local function detect_faces(image)
+    -- Load the pre-trained Haar Cascade face detector
+    local face_cascade = cv.CascadeClassifier{filename = cv.haarcascades..'haarcascade_frontalface_default.xml'}
+    
+    -- Convert the image to grayscale
+    local gray = cv.cvtColor{image, cv.COLOR_BGR2GRAY}
+    
+    -- Detect faces in the image
+    local faces = face_cascade:detectMultiScale{gray, scaleFactor = 1.1, minNeighbors = 5, minSize = {30, 30}}
+    
+    return faces
+end
+
+-- Function to detect color in an image
+local function detect_color(image, lower, upper)
+    -- Convert the image to HSV color space
+    local hsv = cv.cvtColor{image, cv.COLOR_BGR2HSV}
+    
+    -- Threshold the image to get regions with the specified color
+    local mask = cv.inRange{hsv, lower, upper}
+    
+    return mask
+end
+
+-- Function to highlight characters on the screen
+local function highlight_characters(image)
+    -- Create a new image to draw the highlighted characters
+    local highlighted_img = gd.createTrueColor(image.cols, image.rows)
+
+    -- Set the colors for highlighting
+    local red = highlighted_img:colorAllocate(255, 0, 0)
+    local neon_green = highlighted_img:colorAllocate(57, 255, 20)
+
+    -- Copy the original image to the highlighted image
+    highlighted_img:copyResampled(image)
+
+    -- Detect faces in the image
+    local faces = detect_faces(image)
+
+    -- Highlight faces with red rectangles
+    for i = 1, faces.size do
+        local face = faces.data[i]
+        cv.rectangle{highlighted_img, {face.x, face.y}, {face.x + face.width, face.y + face.height}, {255, 0, 0}, 2}
+    end
+
+    -- Iterate through each pixel in the image
+    for y = 0, image.rows - 1 do
+        for x = 0, image.cols - 1 do
+            -- Get the color of the current pixel
+            local b, g, r = image:at{y, x}.r, image:at{y, x}.g, image:at{y, x}.b
+
+            -- Check if the pixel color represents a character (e.g., black)
+            if r == 0 and g == 0 and b == 0 then
+                -- Draw a rectangle around the character with neon green color
+                highlighted_img:rectangle(x, y, x + 1, y + 1, neon_green)
+            end
+        end
+    end
+
+    -- Get the updated frame as a string
+    local updated_frame = highlighted_img:pngStr()
+
+    -- Convert the frame string to a table of bytes
+    local updated_frame_bytes = {string.byte(updated_frame, 1, #updated_frame)}
+
+    -- Return the updated frame
+    return updated_frame_bytes
+end
+
+-- Function to toggle the color bot
+local color_bot_enabled = false
+local function toggle_color_bot()
+    color_bot_enabled = not color_bot_enabled
+    -- Add your logic to start/stop the color bot here
+end
+
+-- Function to toggle ESP
+local esp_enabled = false
+local function toggle_esp()
+    esp_enabled = not esp_enabled
+    -- Add your logic to toggle ESP here
+end
+
+-- Create the main window
+local window = tk.Tk()
+
+-- Create a frame for the game capture
+local video_frame = tk.Frame(window)
+video_frame:pack{side = 'top'}
+
+-- Create a canvas for displaying the game capture
+local canvas = tk.Canvas(video_frame):pack()
+
+-- Create a button to start/stop the color bot
+local color_bot_button = tk.Button(window, {text = 'Color Bot', command = toggle_color_bot})
+color_bot_button:pack{side = 'left'}
+
+-- Create a button to toggle ESP
+local esp_button = tk.Button(window, {text = 'ESP', command = toggle_esp})
+esp_button:pack{side = 'left'}
+
+-- Create a slider for adjusting the smoothness
+local smoothness_slider = tk.Scale(window, {from = 1, to = 100, orient = 'horizontal', label = 'Smoothness'})
+smoothness_slider:set(50)  -- Default smoothness
+smoothness_slider:pack{side = 'left'}
+
+-- Create a frame for the Misc section
+local misc_frame = tk.Frame(window)
+misc_frame:pack{side = 'top'}
+
+-- Create a label for the FOV Circle section
+local fov_label = tk.Label(misc_frame, {text = 'FOV Circle'})
+fov_label:pack{side = 'left'}
+
+-- Create a slider for adjusting the FOV radius
+local fov_slider = tk.Scale(misc_frame, {from = 1, to = 1000, orient = 'horizontal', label = 'FOV Radius'})
+fov_slider:set(500)  -- Default FOV radius
+fov_slider:pack{side = 'left'}
+
+-- Function to toggle the visibility of the FOV circle
+local fov_circle_visible = false
+local function toggle_fov_circle_visibility()
+    fov_circle_visible = not fov_circle_visible
+end
+
+-- Bind the toggle_fov_circle_visibility function to the key press events
+window:bind('<KeyPress-bracketright>', function() toggle_fov_circle_visibility() end)  -- Key: ]
+window:bind('<KeyPress-bracketleft>', function() toggle_fov_circle_visibility() end)   -- Key: [
+
+-- Function to draw a transparent FOV circle on the screen
+local function draw_fov_circle()
+    local fov_radius = fov_slider:get()  -- Get the FOV radius from the slider
+    
+    -- Draw the FOV circle with the updated radius
+    -- You can use the same draw_fov_circle function provided earlier
+    
+    -- Update the visibility of the FOV circle based on the toggle
+    if fov_circle_visible then
+        -- Draw the FOV circle
+    else
+        -- Hide the FOV circle
+    end
+end
+
+-- Create a button for option 2 (FOV Circle)
+local fov_circle_button = tk.Button(misc_frame, {text = 'FOV Circle', command = draw_fov_circle})
+fov_circle_button:pack{side = 'left'}
+
+-- Start the GUI event loop
+tk.mainloop()
